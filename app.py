@@ -210,6 +210,7 @@ if st.button("🎧 Generate Voice Summary"):
                     st.markdown(f"**{headline}**")  # Display the headline
                     st.markdown("### 📄 Detailed Summary:")
                     st.markdown(summary)
+                    save_summary(youtube_link, headline, summary)
                     st.success("✅ Summary has been saved successfully!")
                     st.success("✅ Voice Summary Ready!")
 
