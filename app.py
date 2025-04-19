@@ -3,26 +3,26 @@ import google.generativeai as genai
 from elevenlabs.client import ElevenLabs
 from pymongo import MongoClient
 from datetime import datetime
-from dotenv import load_dotenv
-import os
+# from dotenv import load_dotenv
+# import os
 from youtube_transcript_api import YouTubeTranscriptApi
 
-# GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
-# ELEVENLABS_API_KEY = st.secrets["ELEVENLABS_API_KEY"]
-# MONGODB_URI = st.secrets["MONGODB_URI"]
+GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+ELEVENLABS_API_KEY = st.secrets["ELEVENLABS_API_KEY"]
+MONGODB_URI = st.secrets["MONGODB_URI"]
 
 # Set up your API keys and MongoDB connection
-# genai.configure(api_key=GOOGLE_API_KEY)
-# client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
+genai.configure(api_key=GOOGLE_API_KEY)
+client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
 
-load_dotenv()  # Load variables from .env
+# load_dotenv()  # Load variables from .env
 
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-client = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
+# genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+# client = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
 
 # MongoDB Atlas connection setup
-# client_mongo = MongoClient(MONGODB_URI)  # MongoDB connection URI
-client_mongo = MongoClient(os.getenv("MONGODB_URI"))
+client_mongo = MongoClient(MONGODB_URI)  # MongoDB connection URI
+# client_mongo = MongoClient(os.getenv("MONGODB_URI"))
 db = client_mongo.summaries_db  # Database name
 summaries_collection = db.summaries  # Collection name
 
