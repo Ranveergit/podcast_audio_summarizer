@@ -211,7 +211,7 @@ if st.button("🎧 Generate Voice Summary"):
     with st.spinner("🎙️ Processing audio summary..."):
         try:
             # Extract transcript text from the YouTube link
-            transcript_text = extract_transcript_details(youtube_link)
+            transcript_text = extract_transcript_details(video_id)
             
             if transcript_text:
                 # Generate the headline and summary using the Gemini model
