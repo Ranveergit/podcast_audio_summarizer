@@ -52,10 +52,27 @@ def search_summaries_by_headline(search_query):
     })
     return list(results)
 
+
+## extracting video id :: 
+ 
+def extract_video_id(url):
+    """
+    Extracts the YouTube video ID from different URL formats.
+    Supports:
+    - https://www.youtube.com/watch?v=VIDEO_ID
+    - https://youtu.be/VIDEO_ID
+    """
+    pattern = r"(?:v=|\/)([0-9A-Za-z_-]{11})"
+    match = re.search(pattern, url)
+    if match:
+        return match.group(1)
+    return None    
+
+
 # Get the transcript data from YouTube videos
-def extract_transcript_details(youtube_video_url):
+def extract_transcript_details(video_id):
     try:
-        video_id = youtube_video_url.split("=")[1]
+    
         transcript_text = YouTubeTranscriptApi.get_transcript(video_id)
         
         transcript = ""
@@ -144,7 +161,7 @@ youtube_link = st.text_input("🔗 Paste the podcast Link Below:")
 
 if youtube_link:
     try:
-        video_id = youtube_link.split("v=")[1]
+        video_id = extract_video_id(youtube_link)
         thumbnail_url = f"http://img.youtube.com/vi/{video_id}/0.jpg"
         st.image(thumbnail_url, use_column_width=True, caption="🎬 Video Preview")
     except IndexError:
@@ -154,7 +171,7 @@ if youtube_link:
 if st.button("📝 Generate Detailed Summary"):
     with st.spinner("⏳ Extracting transcript and summarizing..."):
         try:
-            transcript_text = extract_transcript_details(youtube_link)
+            transcript_text = extract_transcript_details(video_id)
             if transcript_text:
                 headline, summary = generate_gemini_content(transcript_text, prompt)
                 
