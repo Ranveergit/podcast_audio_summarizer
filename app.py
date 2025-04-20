@@ -5,7 +5,9 @@ from pymongo import MongoClient
 from datetime import datetime
 # from dotenv import load_dotenv
 # import os
+import re
 from youtube_transcript_api import YouTubeTranscriptApi
+
 
 GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 ELEVENLABS_API_KEY = st.secrets["ELEVENLABS_API_KEY"]
