@@ -73,27 +73,49 @@ def extract_video_id(url):
 
 
 # Get the transcript data from YouTube videos
+# def extract_transcript_details(video_id):
+#     try:
+#         # Set up proxy configuration
+#         # proxy_config = WebshareProxyConfig(
+#         #     proxy_username="uvmfwcbs",
+#         #     proxy_password="imui7uhheoxm"
+#         # )
+
+#         YttApi = YouTubeTranscriptApi(
+#            proxy_config=WebshareProxyConfig(
+#            proxy_username="uvmfwcbs",
+#            proxy_password="imui7uhheoxm",
+#            )
+#        )
+
+#         # Pass proxy config when fetching transcript
+#         transcript_text = YttApi.get_transcript(video_id)
+
+#         # Concatenate all transcript pieces into a single string
+#         transcript = " ".join([item["text"] for item in transcript_text])
+
+#         return transcript
+
+#     except Exception as e:
+#         raise e
+
+
 def extract_transcript_details(video_id):
     try:
         # Set up proxy configuration
-        # proxy_config = WebshareProxyConfig(
-        #     proxy_username="uvmfwcbs",
-        #     proxy_password="imui7uhheoxm"
-        # )
+        proxy_config = WebshareProxyConfig(
+            proxy_username="uvmfwcbs",
+            proxy_password="imui7uhheoxm"
+        )
 
-        YouTubeTranscriptApi = YouTubeTranscriptApi(
-           proxy_config=WebshareProxyConfig(
-           proxy_username="uvmfwcbs",
-           proxy_password="imui7uhheoxm",
-           )
-       )
-
-        # Pass proxy config when fetching transcript
-        transcript_text = YouTubeTranscriptApi.get_transcript(video_id)
+        # Get transcript using the proxy
+        transcript_text = YouTubeTranscriptApi.get_transcript(
+            video_id,
+            proxies=proxy_config.proxies  
+        )
 
         # Concatenate all transcript pieces into a single string
         transcript = " ".join([item["text"] for item in transcript_text])
-
         return transcript
 
     except Exception as e:
