@@ -89,7 +89,7 @@ def extract_transcript_details(video_id):
        )
 
         # Pass proxy config when fetching transcript
-        transcript_text = YouTubeTranscriptApi.get_transcript(video_id, proxies=proxy_config.proxies)
+        transcript_text = YouTubeTranscriptApi.get_transcript(video_id)
 
         # Concatenate all transcript pieces into a single string
         transcript = " ".join([item["text"] for item in transcript_text])
