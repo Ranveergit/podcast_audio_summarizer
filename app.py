@@ -99,7 +99,6 @@ def extract_video_id(url):
 #     except Exception as e:
 #         raise e
 
-
 def extract_transcript_details(video_id):
     try:
         # Set up proxy configuration
@@ -108,16 +107,18 @@ def extract_transcript_details(video_id):
             proxy_password="imui7uhheoxm"
         )
 
-        proxy = proxy_config.get_proxy()
+        # Initialize the API with the proxy configuration
+        ytt_api = YouTubeTranscriptApi(proxy_config=proxy_config)
 
-        # Pass proxy as a dictionary
-        transcript_text = YouTubeTranscriptApi.get_transcript(
-            video_id,
-            proxies={"https": proxy}  
-        )
+        # Fetch the transcript
+        fetched_transcript = ytt_api.fetch(video_id)
 
-        # Combine transcript pieces into a single string
-        transcript = " ".join([item["text"] for item in transcript_text])
+        # Convert the fetched transcript to raw data
+        transcript_data = fetched_transcript.to_raw_data()
+
+        # Concatenate all transcript pieces into a single string
+        transcript = " ".join([item["text"] for item in transcript_data])
+
         return transcript
 
     except Exception as e:
