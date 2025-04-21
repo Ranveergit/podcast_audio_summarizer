@@ -5,9 +5,9 @@ from pymongo import MongoClient
 from datetime import datetime
 # from dotenv import load_dotenv
 # import os
-import re
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api.proxies import WebshareProxyConfig
+import re
 
 
 GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
@@ -76,10 +76,17 @@ def extract_video_id(url):
 def extract_transcript_details(video_id):
     try:
         # Set up proxy configuration
-        proxy_config = WebshareProxyConfig(
-            proxy_username="uvmfwcbs",
-            proxy_password="imui7uhheoxm"
-        )
+        # proxy_config = WebshareProxyConfig(
+        #     proxy_username="uvmfwcbs",
+        #     proxy_password="imui7uhheoxm"
+        # )
+
+        YouTubeTranscriptApi = YouTubeTranscriptApi(
+           proxy_config=WebshareProxyConfig(
+           proxy_username="uvmfwcbs",
+           proxy_password="imui7uhheoxm",
+           )
+       )
 
         # Pass proxy config when fetching transcript
         transcript_text = YouTubeTranscriptApi.get_transcript(video_id, proxies=proxy_config.proxies)
