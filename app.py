@@ -99,30 +99,85 @@ def extract_video_id(url):
 #     except Exception as e:
 #         raise e
 
+# def extract_transcript_details(video_id):
+#     try:
+#         # Set up proxy configuration
+#         proxy_config = WebshareProxyConfig(
+#             proxy_username="uvmfwcbs",
+#             proxy_password="imui7uhheoxm"
+#         )
+
+#         # Initialize the API with the proxy configuration
+#         ytt_api = YouTubeTranscriptApi(proxy_config=proxy_config)
+
+#         # Fetch the transcript
+#         fetched_transcript = ytt_api.fetch(video_id)
+
+#         # Convert the fetched transcript to raw data
+#         transcript_data = fetched_transcript.to_raw_data()
+
+#         # Concatenate all transcript pieces into a single string
+#         transcript = " ".join([item["text"] for item in transcript_data])
+
+#         return transcript
+
+#     except Exception as e:
+#         raise e
+
+
+
+
+
 def extract_transcript_details(video_id):
     try:
-        # Set up proxy configuration
+        # Set up proxy configuration (if you're using a proxy)
         proxy_config = WebshareProxyConfig(
             proxy_username="uvmfwcbs",
             proxy_password="imui7uhheoxm"
         )
 
-        # Initialize the API with the proxy configuration
+        # Initialize the YouTubeTranscriptApi with proxy configuration
         ytt_api = YouTubeTranscriptApi(proxy_config=proxy_config)
 
-        # Fetch the transcript
-        fetched_transcript = ytt_api.fetch(video_id)
+        # List available transcripts for the video
+        transcripts = ytt_api.list_transcripts(video_id)
 
-        # Convert the fetched transcript to raw data
-        transcript_data = fetched_transcript.to_raw_data()
+        # Debugging: Print available languages
+        available_languages = [t.language_code for t in transcripts]
+        print(f"Available transcripts for video {video_id}: {available_languages}")
 
-        # Concatenate all transcript pieces into a single string
-        transcript = " ".join([item["text"] for item in transcript_data])
+        # Try fetching transcript in the following order: English, English (India), Hindi
+        for lang in ['en','en-IN','hi']:
+            if lang in available_languages:
+                try:
+                    # Try to find the transcript for the language
+                    transcript = transcripts.find_transcript([lang])
+                    fetched_transcript = transcript.fetch()
 
-        return transcript
+                    # Convert the fetched transcript to raw data
+                    transcript_data = transcript.fetch()
+                    # Concatenate all transcript pieces into a single string
+                    # full_transcript = " ".join([item["text"] for item in transcript_data])
+                    print(f"checking transcript of {lang} ....")
+                    full_transcript = " ".join([getattr(item, "text", "") for item in transcript_data])
+                    print(f"retrieved transcript for {lang} successfully")
+
+                    return full_transcript  # Return the concatenated transcript
+                except Exception as e:
+                    print(f"Could not retrieve transcript for {lang}. Error: {e}")
+            else:
+                print(f"Transcript for language {lang} not available in the video.")
+
+        # If no transcript was found in any of the preferred languages, raise an error
+        raise ValueError(f"No available transcripts for the video in the preferred languages: from english , english-india . Available languages: {available_languages}")
 
     except Exception as e:
-        raise e
+        raise e  # Re-raise the error if something went wrong
+
+
+
+
+
 
 # Get the summary and headline based on the YouTube transcript
 def generate_gemini_content(transcript_text, prompt):
