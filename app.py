@@ -7,6 +7,7 @@ from datetime import datetime
 # import os
 import re
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api.proxies import WebshareProxyConfig
 
 
 GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
@@ -74,12 +75,17 @@ def extract_video_id(url):
 # Get the transcript data from YouTube videos
 def extract_transcript_details(video_id):
     try:
-    
-        transcript_text = YouTubeTranscriptApi.get_transcript(video_id)
-        
-        transcript = ""
-        for i in transcript_text:
-            transcript += " " + i["text"]
+        # Set up proxy configuration
+        proxy_config = WebshareProxyConfig(
+            proxy_username="uvmfwcbs",
+            proxy_password="imui7uhheoxm"
+        )
+
+        # Pass proxy config when fetching transcript
+        transcript_text = YouTubeTranscriptApi.get_transcript(video_id, proxies=proxy_config.proxies)
+
+        # Concatenate all transcript pieces into a single string
+        transcript = " ".join([item["text"] for item in transcript_text])
 
         return transcript
 
