@@ -108,13 +108,15 @@ def extract_transcript_details(video_id):
             proxy_password="imui7uhheoxm"
         )
 
-        # Get transcript using the proxy
+        proxy = proxy_config.get_proxy()
+
+        # Pass proxy as a dictionary
         transcript_text = YouTubeTranscriptApi.get_transcript(
             video_id,
-            proxies=proxy_config.proxies  
+            proxies={"https": proxy}  
         )
 
-        # Concatenate all transcript pieces into a single string
+        # Combine transcript pieces into a single string
         transcript = " ".join([item["text"] for item in transcript_text])
         return transcript
 
