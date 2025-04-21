@@ -132,7 +132,7 @@ def extract_transcript_details(video_id):
     try:
         # Set up proxy configuration (if you're using a proxy)
         proxy_config = WebshareProxyConfig(
-            proxy_username="uvmfwcbs",
+            proxy_username="uvmfwcbs-rotate",
             proxy_password="imui7uhheoxm"
         )
 
