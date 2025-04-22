@@ -181,56 +181,60 @@ def extract_transcript_details(video_id):
     # Store the original requests.get method
     original_get = requests.get
 
-    # Define a patched version of requests.get to route through the Webshare rotating proxy
+    # Webshare proxy configuration
+    proxies = {
+        "http": "http://uvmfwcbs-rotate:imui7uhheoxm@p.webshare.io:80",
+        "https": "http://uvmfwcbs-rotate:imui7uhheoxm@p.webshare.io:80"
+    }
+
+    # Proxy-enabled version of requests.get
     def proxy_get(*args, **kwargs):
-        kwargs['proxies'] = {
-            "http": "http://uvmfwcbs-rotate:imui7uhheoxm@p.webshare.io:80",
-            "https": "http://uvmfwcbs-rotate:imui7uhheoxm@p.webshare.io:80"
-        }
+        kwargs['proxies'] = proxies
         return original_get(*args, **kwargs)
 
-    # Monkey patch requests.get
+    # Monkey patch requests.get globally
     requests.get = proxy_get
 
     try:
-        # List available transcripts for the video
-        transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
+        # Step 1: Check IP address via proxy
+        try:
+            ip_response = requests.get("http://httpbin.org/ip")
+            ip_info = ip_response.json()
+            print(f"[Proxy Check] Current IP: {ip_info.get('origin')}")
+        except Exception as e:
+            print(f"[Proxy Check] Failed to retrieve IP. Error: {e}")
 
-        # Debugging: Print available languages
+        # Step 2: Get available transcripts
+        transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
         available_languages = [t.language_code for t in transcripts]
         print(f"Available transcripts for video {video_id}: {available_languages}")
 
-        # Try fetching transcript in the following order: English, English (India), Hindi
+        # Step 3: Try preferred languages
         for lang in ['en', 'en-IN', 'hi']:
             if lang in available_languages:
                 try:
-                    # Try to find the transcript for the language
                     transcript = transcripts.find_transcript([lang])
                     transcript_data = transcript.fetch()
 
-                    print(f"Checking transcript of {lang} ....")
-                    full_transcript = " ".join([getattr(item, "text", "") for item in transcript_data])
-                    print(f"Retrieved transcript for {lang} successfully")
-
+                    # 🛠 Corrected here — use item.text instead of item["text"]
+                    full_transcript = " ".join([item.text for item in transcript_data])
+                    print(f"✅ Retrieved transcript for {lang}")
                     return full_transcript
-                except Exception as e:
-                    print(f"Could not retrieve transcript for {lang}. Error: {e}")
-            else:
-                print(f"Transcript for language {lang} not available in the video.")
 
-        # If no transcript was found in any of the preferred languages, raise an error
-        raise ValueError(
-            f"No available transcripts for the video in the preferred languages: "
-            f"from English, English-India, Hindi. Available languages: {available_languages}"
-        )
+                except Exception as e:
+                    print(f"❌ Error retrieving transcript for {lang}: {e}")
+            else:
+                print(f"ℹ️ Transcript not available for: {lang}")
+
+        raise ValueError(f"No transcripts found in preferred languages. Available: {available_languages}")
 
     except Exception as e:
-        raise e  # Re-raise the error if something went wrong
+        print(f"❌ Error during transcript extraction: {e}")
+        raise
 
     finally:
-        # Restore the original requests.get method
+        # Restore original requests.get
         requests.get = original_get
-
 
 
 
