@@ -7,6 +7,7 @@ from datetime import datetime
 # import os
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api.proxies import WebshareProxyConfig
+import requests
 import re
 
 
@@ -128,53 +129,107 @@ def extract_video_id(url):
 
 
 
+# def extract_transcript_details(video_id):
+#     try:
+#         # Set up proxy configuration (if you're using a proxy)
+#         proxy_config = WebshareProxyConfig(
+#             proxy_username="uvmfwcbs-rotate",
+#             proxy_password="imui7uhheoxm"
+#         )
+
+#         # Initialize the YouTubeTranscriptApi with proxy configuration
+#         ytt_api = YouTubeTranscriptApi(proxy_config=proxy_config)
+
+#         # List available transcripts for the video
+#         transcripts = ytt_api.list_transcripts(video_id)
+
+#         # Debugging: Print available languages
+#         available_languages = [t.language_code for t in transcripts]
+#         print(f"Available transcripts for video {video_id}: {available_languages}")
+
+#         # Try fetching transcript in the following order: English, English (India), Hindi
+#         for lang in ['en','en-IN','hi']:
+#             if lang in available_languages:
+#                 try:
+#                     # Try to find the transcript for the language
+#                     transcript = transcripts.find_transcript([lang])
+#                     fetched_transcript = transcript.fetch()
+
+#                     # Convert the fetched transcript to raw data
+#                     transcript_data = transcript.fetch()
+#                     # Concatenate all transcript pieces into a single string
+#                     # full_transcript = " ".join([item["text"] for item in transcript_data])
+#                     print(f"checking transcript of {lang} ....")
+#                     full_transcript = " ".join([getattr(item, "text", "") for item in transcript_data])
+#                     print(f"retrieved transcript for {lang} successfully")
+
+#                     return full_transcript  # Return the concatenated transcript
+#                 except Exception as e:
+#                     print(f"Could not retrieve transcript for {lang}. Error: {e}")
+#             else:
+#                 print(f"Transcript for language {lang} not available in the video.")
+
+#         # If no transcript was found in any of the preferred languages, raise an error
+#         raise ValueError(f"No available transcripts for the video in the preferred languages: from english , english-india . Available languages: {available_languages}")
+
+#     except Exception as e:
+#         raise e  # Re-raise the error if something went wrong
+
+
+
 def extract_transcript_details(video_id):
+    # Store the original requests.get method
+    original_get = requests.get
+
+    # Define a patched version of requests.get to route through the Webshare rotating proxy
+    def proxy_get(*args, **kwargs):
+        kwargs['proxies'] = {
+            "http": "http://uvmfwcbs-rotate:imui7uhheoxm@proxy.webshare.io:80",
+            "https": "http://uvmfwcbs-rotate:imui7uhheoxm@proxy.webshare.io:80"
+        }
+        return original_get(*args, **kwargs)
+
+    # Monkey patch requests.get
+    requests.get = proxy_get
+
     try:
-        # Set up proxy configuration (if you're using a proxy)
-        proxy_config = WebshareProxyConfig(
-            proxy_username="uvmfwcbs-rotate",
-            proxy_password="imui7uhheoxm"
-        )
-
-        # Initialize the YouTubeTranscriptApi with proxy configuration
-        ytt_api = YouTubeTranscriptApi(proxy_config=proxy_config)
-
         # List available transcripts for the video
-        transcripts = ytt_api.list_transcripts(video_id)
+        transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
 
         # Debugging: Print available languages
         available_languages = [t.language_code for t in transcripts]
         print(f"Available transcripts for video {video_id}: {available_languages}")
 
         # Try fetching transcript in the following order: English, English (India), Hindi
-        for lang in ['en','en-IN','hi']:
+        for lang in ['en', 'en-IN', 'hi']:
             if lang in available_languages:
                 try:
                     # Try to find the transcript for the language
                     transcript = transcripts.find_transcript([lang])
-                    fetched_transcript = transcript.fetch()
-
-                    # Convert the fetched transcript to raw data
                     transcript_data = transcript.fetch()
-                    # Concatenate all transcript pieces into a single string
-                    # full_transcript = " ".join([item["text"] for item in transcript_data])
-                    print(f"checking transcript of {lang} ....")
-                    full_transcript = " ".join([getattr(item, "text", "") for item in transcript_data])
-                    print(f"retrieved transcript for {lang} successfully")
 
-                    return full_transcript  # Return the concatenated transcript
+                    print(f"Checking transcript of {lang} ....")
+                    full_transcript = " ".join([getattr(item, "text", "") for item in transcript_data])
+                    print(f"Retrieved transcript for {lang} successfully")
+
+                    return full_transcript
                 except Exception as e:
                     print(f"Could not retrieve transcript for {lang}. Error: {e}")
             else:
                 print(f"Transcript for language {lang} not available in the video.")
 
         # If no transcript was found in any of the preferred languages, raise an error
-        raise ValueError(f"No available transcripts for the video in the preferred languages: from english , english-india . Available languages: {available_languages}")
+        raise ValueError(
+            f"No available transcripts for the video in the preferred languages: "
+            f"from English, English-India, Hindi. Available languages: {available_languages}"
+        )
 
     except Exception as e:
         raise e  # Re-raise the error if something went wrong
 
-
+    finally:
+        # Restore the original requests.get method
+        requests.get = original_get
 
 
 
