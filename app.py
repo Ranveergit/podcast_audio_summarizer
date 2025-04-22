@@ -184,8 +184,8 @@ def extract_transcript_details(video_id):
     # Define a patched version of requests.get to route through the Webshare rotating proxy
     def proxy_get(*args, **kwargs):
         kwargs['proxies'] = {
-            "http": "http://uvmfwcbs-rotate:imui7uhheoxm@proxy.webshare.io:80",
-            "https": "http://uvmfwcbs-rotate:imui7uhheoxm@proxy.webshare.io:80"
+            "http": "http://uvmfwcbs-rotate:imui7uhheoxm@p.webshare.io:80",
+            "https": "http://uvmfwcbs-rotate:imui7uhheoxm@p.webshare.io:80"
         }
         return original_get(*args, **kwargs)
 
