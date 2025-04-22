@@ -238,6 +238,7 @@ def extract_transcript_details(video_id):
 
 
 
+
 # Get the summary and headline based on the YouTube transcript
 def generate_gemini_content(transcript_text, prompt):
     model = genai.GenerativeModel("gemini-1.5-flash")
