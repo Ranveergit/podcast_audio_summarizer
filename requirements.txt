@@ -5,3 +5,4 @@ python-dotenv
 pathlib
 pymongo[srv]==3.12
 elevenlabs
+retrying
