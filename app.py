@@ -178,65 +178,155 @@ def extract_video_id(url):
 
 
 
+# def extract_transcript_details(video_id):
+#     # Store the original requests.get method
+#     original_get = requests.get
+
+#     # Webshare proxy configuration
+#     proxies = {
+#         "http": "http://uvmfwcbs-rotate:imui7uhheoxm@p.webshare.io:80",
+#         "https": "http://uvmfwcbs-rotate:imui7uhheoxm@p.webshare.io:80"
+#     }
+
+#     # Proxy-enabled version of requests.get
+#     def proxy_get(*args, **kwargs):
+#         kwargs['proxies'] = proxies
+#         return original_get(*args, **kwargs)
+
+#     # Monkey patch requests.get globally
+#     requests.get = proxy_get
+
+#     try:
+#         # Step 1: Check IP address via proxy
+#         # try:
+#         #     ip_response = requests.get("http://httpbin.org/ip")
+#         #     ip_info = ip_response.json()
+#         #     print(f"[Proxy Check] Current IP: {ip_info.get('origin')}")
+#         # except Exception as e:
+#         #     print(f"[Proxy Check] Failed to retrieve IP. Error: {e}")
+
+#         # Step 2: Get available transcripts
+#         transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
+#         available_languages = [t.language_code for t in transcripts]
+#         print(f"Available transcripts for video {video_id}: {available_languages}")
+
+#         # Step 3: Try preferred languages
+#         for lang in ['en', 'en-IN', 'hi']:
+#             if lang in available_languages:
+#                 try:
+#                     transcript = transcripts.find_transcript([lang])
+#                     transcript_data = transcript.fetch()
+
+#                     # 🛠 Corrected here — use item.text instead of item["text"]
+#                     full_transcript = " ".join([item.text for item in transcript_data])
+#                     print(f"✅ Retrieved transcript for {lang}")
+#                     return full_transcript
+
+#                 except Exception as e:
+#                     print(f"❌ Error retrieving transcript for {lang}: {e}")
+#             else:
+#                 print(f"ℹ️ Transcript not available for: {lang}")
+
+#         raise ValueError(f"No transcripts found in preferred languages. Available: {available_languages}")
+
+#     except Exception as e:
+#         print(f"❌ Error during transcript extraction: {e}")
+#         raise
+
+#     finally:
+#         # Restore original requests.get
+#         requests.get = original_get
+
+
+
+
+
+
 def extract_transcript_details(video_id):
-    # Store the original requests.get method
-    original_get = requests.get
+    """
+    Extracts transcript details from a YouTube video, using a rotating proxy to avoid IP blocking.
 
-    # Webshare proxy configuration
-    proxies = {
-        "http": "http://uvmfwcbs-rotate:imui7uhheoxm@p.webshare.io:80",
-        "https": "http://uvmfwcbs-rotate:imui7uhheoxm@p.webshare.io:80"
-    }
+    Args:
+        video_id (str): The YouTube video ID.
 
-    # Proxy-enabled version of requests.get
-    def proxy_get(*args, **kwargs):
-        kwargs['proxies'] = proxies
-        return original_get(*args, **kwargs)
+    Returns:
+        str: The full transcript text, or None if no transcript is found or an error occurs.
+    """
 
-    # Monkey patch requests.get globally
-    requests.get = proxy_get
+    # Webshare proxy configuration (Add more proxies to this list for better rotation)
+    proxy_list = [
+        "http://uvmfwcbs-rotate:imui7uhheoxm@p.webshare.io:80",
+        # "http://user2:pass2@host2:port2",  # Add more proxies here to rotate through
+        # "http://user3:pass3@host3:port3",
+    ]
+
+    def get_working_proxy(proxies):
+        """
+        Checks if the proxies are working and returns a working proxy.
+        Args:
+            proxies (list): A list of proxy URLs
+        Returns:
+             str: A working proxy.
+        """
+        for proxy_url in proxies:
+            try:
+                print(f"ℹ️  Checking proxy: {proxy_url}")
+                response = requests.get(
+                    "https://ipv4.webshare.io/",
+                    proxies={"http": proxy_url, "https": proxy_url},
+                    timeout=5  # Added timeout
+                )
+                response.raise_for_status()
+                response_text = response.text
+
+                if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", response_text):
+                    print(f"✅  Working proxy: {proxy_url}, IP: {response_text}")
+                    return proxy_url
+                else:
+                    print(
+                        f"❌  Proxy {proxy_url} did not return an IP address.  Response: {response_text}"
+                    )
+
+            except requests.exceptions.RequestException as e:
+                print(f"❌  Proxy {proxy_url} failed: {e}")
+        return None
+
+    original_get = requests.get  # Store the original requests.get
 
     try:
-        # Step 1: Check IP address via proxy
-        # try:
-        #     ip_response = requests.get("http://httpbin.org/ip")
-        #     ip_info = ip_response.json()
-        #     print(f"[Proxy Check] Current IP: {ip_info.get('origin')}")
-        # except Exception as e:
-        #     print(f"[Proxy Check] Failed to retrieve IP. Error: {e}")
+        working_proxy = get_working_proxy(proxy_list)
+        if not working_proxy:
+            raise Exception("No working proxies available")
 
-        # Step 2: Get available transcripts
+        def proxy_get(*args, **kwargs):
+            kwargs["proxies"] = {"http": working_proxy, "https": working_proxy}
+            return original_get(*args, **kwargs)
+
+        requests.get = proxy_get  # Apply the monkey patch
+
         transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
         available_languages = [t.language_code for t in transcripts]
         print(f"Available transcripts for video {video_id}: {available_languages}")
 
-        # Step 3: Try preferred languages
-        for lang in ['en', 'en-IN', 'hi']:
+        for lang in ["en", "en-IN", "hi"]:
             if lang in available_languages:
                 try:
                     transcript = transcripts.find_transcript([lang])
                     transcript_data = transcript.fetch()
-
-                    # 🛠 Corrected here — use item.text instead of item["text"]
                     full_transcript = " ".join([item.text for item in transcript_data])
                     print(f"✅ Retrieved transcript for {lang}")
                     return full_transcript
-
                 except Exception as e:
                     print(f"❌ Error retrieving transcript for {lang}: {e}")
-            else:
-                print(f"ℹ️ Transcript not available for: {lang}")
-
-        raise ValueError(f"No transcripts found in preferred languages. Available: {available_languages}")
+        raise ValueError(
+            f"No transcripts found in preferred languages. Available: {available_languages}"
+        )
 
     except Exception as e:
         print(f"❌ Error during transcript extraction: {e}")
-        raise
-
+        return None  # Important:  Return None on error, don't just raise.
     finally:
-        # Restore original requests.get
-        requests.get = original_get
-
+        requests.get = original_get  # Restore the original requests.get
 
 
 
@@ -251,6 +341,8 @@ def generate_gemini_content(transcript_text, prompt):
     summary = lines[1] if len(lines) > 1 else "No summary available"
 
     return headline, summary
+
+
 
 
 # Convert text to audio using ElevenLabs
