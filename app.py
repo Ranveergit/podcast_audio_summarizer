@@ -198,12 +198,12 @@ def extract_transcript_details(video_id):
 
     try:
         # Step 1: Check IP address via proxy
-        try:
-            ip_response = requests.get("http://httpbin.org/ip")
-            ip_info = ip_response.json()
-            print(f"[Proxy Check] Current IP: {ip_info.get('origin')}")
-        except Exception as e:
-            print(f"[Proxy Check] Failed to retrieve IP. Error: {e}")
+        # try:
+        #     ip_response = requests.get("http://httpbin.org/ip")
+        #     ip_info = ip_response.json()
+        #     print(f"[Proxy Check] Current IP: {ip_info.get('origin')}")
+        # except Exception as e:
+        #     print(f"[Proxy Check] Failed to retrieve IP. Error: {e}")
 
         # Step 2: Get available transcripts
         transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
