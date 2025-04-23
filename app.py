@@ -3,57 +3,43 @@ import google.generativeai as genai
 from elevenlabs.client import ElevenLabs
 from pymongo import MongoClient
 from datetime import datetime
-from dotenv import load_dotenv
-import os
-from youtube_transcript_api import YouTubeTranscriptApi
 import requests
 import re
+from retrying import retry  # Import the retry decorator
+from youtube_transcript_api import YouTubeTranscriptApi # Import YouTubeTranscriptApi
 
-
-
+# Your API keys and MongoDB connection (from Streamlit secrets)
 GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 ELEVENLABS_API_KEY = st.secrets["ELEVENLABS_API_KEY"]
 MONGODB_URI = st.secrets["MONGODB_URI"]
-
-
 
 # Set up your API keys and MongoDB connection
 genai.configure(api_key=GOOGLE_API_KEY)
 client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
 
-
-
 # MongoDB Atlas connection setup
-client_mongo = MongoClient(MONGODB_URI)  # MongoDB connection URI
-db = client_mongo.summaries_db  # Database name
-summaries_collection = db.summaries  # Collection name  - corrected line
-
-
+client_mongo = MongoClient(MONGODB_URI)
+db = client_mongo.summaries_db
+summaries_collection = db.summaries
 
 prompt = """You are a video summarizer. You will be taking the transcript text
 and summarizing the entire video and providing the important summary in points
 within 250 words. Please provide the summary of the text along with headline in 4 words given here:  """
 
-
-
 # Save summary with headline to MongoDB
 def save_summary(youtube_url, headline, summary):
     document = {
         "youtube_url": youtube_url,
-        "headline": headline,  # Store the headline
+        "headline": headline,
         "summary": summary,
         "timestamp": datetime.now(),
     }
     summaries_collection.insert_one(document)
 
-
-
 # Fetch the latest summaries from MongoDB based on user selection
 def get_latest_saved_summaries(limit):
     results = summaries_collection.find().sort("timestamp", -1).limit(limit)
     return list(results)
-
-
 
 # Search summaries in MongoDB by headline
 def search_summaries_by_headline(search_query):
@@ -61,10 +47,6 @@ def search_summaries_by_headline(search_query):
         "headline": {"$regex": search_query, "$options": "i"},  # Case-insensitive search by headline
     })
     return list(results)
-
-
-
-
 
 def extract_video_id(url):
     """
@@ -79,10 +61,7 @@ def extract_video_id(url):
         return match.group(1)
     return None
 
-
-
-
-
+@retry(stop_max_attempt_number=5, wait_exponential_multiplier=1000, wait_exponential_max=10000)
 def extract_transcript_details(video_id):
     """
     Extracts transcript details from a YouTube video, using a rotating proxy to avoid IP blocking.
@@ -104,7 +83,7 @@ def extract_transcript_details(video_id):
         Args:
             proxies (list): A list of proxy URLs
         Returns:
-             str: A working proxy.
+            str: A working proxy.
         """
         for proxy_url in proxies:
             try:
@@ -156,29 +135,25 @@ def extract_transcript_details(video_id):
         )
     except Exception as e:
         print(f"❌ Error during transcript extraction: {e}")
-        return None  # Important:  Return None on error, don't just raise.
+        raise  # Re-raise the exception to trigger retry
     finally:
         requests.get = original_get  # Restore the original requests.get
 
-
-
-
-
-# Get the summary and headline based on the YouTube transcript
+@retry(stop_max_attempt_number=3, wait_fixed=2000)  # Retry summary generation
 def generate_gemini_content(transcript_text, prompt):
     model = genai.GenerativeModel("gemini-1.5-flash")
-    response = model.generate_content(prompt + transcript_text)
-    # Assuming that the model responds with both headline and summary (you may need to adjust based on actual model behavior)
-    lines = response.text.split("\n", 1)
-    headline = lines[0] if len(lines) > 0 else "No headline available"
-    summary = lines[1] if len(lines) > 1 else "No summary available"
-    return headline, summary
+    try:
+        response = model.generate_content(prompt + transcript_text)
+        lines = response.text.split("\n", 1)
+        headline = lines[0] if len(lines) > 0 else "No headline available"
+        summary = lines[1] if len(lines) > 1 else "No summary available"
+        return headline, summary
+    except Exception as e:
+        print(f"❌ Error generating summary: {e}")
+        st.error(f"❌ Error generating summary. Retrying...")  # Show error with retry message
+        raise  # Re-raise to trigger retry
 
-
-
-
-
-# Convert text to audio using ElevenLabs
+@retry(stop_max_attempt_number=3, wait_fixed=2000) #Retry audio generation
 def generate_audio(response_text):
     try:
         audio_stream = client.text_to_speech.convert(
@@ -191,16 +166,15 @@ def generate_audio(response_text):
         audio_bytes = b"".join(audio_stream)  # Convert generator to bytes
         return audio_bytes
     except Exception as e:
+        print(f"❌ Error generating audio: {e}")
+        st.error(f"❌ Error generating audio. Retrying...") # Show error with retry message
         raise RuntimeError(f"Failed to generate audio: {e}")
-
-
-
-
 
 # Streamlit app setup
 st.set_page_config(page_title="🎙️ Podcast Summary App", layout="centered")
 st.title("🎙️ Podcast Summarizer")
 st.subheader("Summarize & Search Any Podcast Instantly")
+
 # Search functionality for headlines
 search_query = st.text_input("🔍 Search by Headline:")
 if search_query:
@@ -215,6 +189,7 @@ if search_query:
             st.write(f"Timestamp: {result['timestamp']}")
     else:
         st.warning("No summaries found matching your search.")
+
 # Show Latest Saved Summaries Button & Select the number of summaries
 with st.expander("Show Latest Saved Summaries"):
     # Add a slider to select the number of summaries to retrieve
@@ -236,6 +211,7 @@ with st.expander("Show Latest Saved Summaries"):
                     st.warning("No saved summaries found.")
             except Exception as e:
                 st.error(f"❌ Error fetching saved summaries: {str(e)}")
+
 # Paste YouTube Link
 youtube_link = st.text_input("🔗 Paste the podcast Link Below:")
 if youtube_link:
@@ -245,6 +221,7 @@ if youtube_link:
         st.image(thumbnail_url, use_column_width=True, caption="🎬 Video Preview")
     except IndexError:
         st.error("❌ Please enter a valid YouTube video link.")
+
 # Generate Summary with Headline and Optionally Save
 if st.button("📝 Generate Detailed Summary"):
     with st.spinner("⏳ Extracting transcript and summarizing..."):
@@ -261,8 +238,9 @@ if st.button("📝 Generate Detailed Summary"):
                 save_summary(youtube_link, headline, summary)  # Save the headline and summary
                 st.success("✅ Summary has been saved successfully!")
         except Exception as e:
-            st.error(f"❌ Error: {str(e)}")
-Generate Voice Summary
+            st.error(f"❌ Error: {str(e)}") # Show the last error
+
+# Generate Voice Summary
 if st.button("🎧 Generate Voice Summary"):
     with st.spinner("🎙️ Processing audio summary..."):
         try:
@@ -291,7 +269,9 @@ if st.button("🎧 Generate Voice Summary"):
             else:
                 st.warning("⚠️ No transcript available.")
         except Exception as e:
-            st.error(f"❌ Error generating voice summary: {str(e)}")
+            st.error(f"❌ Error generating voice summary: {str(e)}") # Show the last error
+
 st.markdown("---")
 st.caption("✨ Built with ❤️ using Streamlit, Google Gemini, and ElevenLabs.")
+
 
