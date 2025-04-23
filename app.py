@@ -6,12 +6,32 @@ from datetime import datetime
 import requests
 import re
 from retrying import retry  # Import the retry decorator
-from youtube_transcript_api import YouTubeTranscriptApi # Import YouTubeTranscriptApi
+from youtube_transcript_api import YouTubeTranscriptApi
+import random
+import time
+# import os  # Import the os module
+# from dotenv import load_dotenv  # Import load_dotenv
 
-# Your API keys and MongoDB connection (from Streamlit secrets)
+# Load environment variables from .env file
+# load_dotenv()
+
+# Your API keys and MongoDB connection (from environment variables)
+# GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+# ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY")
+# MONGODB_URI = os.environ.get("MONGODB_URI")
+
 GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 ELEVENLABS_API_KEY = st.secrets["ELEVENLABS_API_KEY"]
 MONGODB_URI = st.secrets["MONGODB_URI"]
+
+# Check if the environment variables are set
+if not GOOGLE_API_KEY:
+    raise EnvironmentError("GOOGLE_API_KEY is not set. Please set it as an environment variable or in a .env file.")
+if not ELEVENLABS_API_KEY:
+    raise EnvironmentError("ELEVENLABS_API_KEY is not set. Please set it as an environment variable or in a .env file.")
+if not MONGODB_URI:
+    raise EnvironmentError("MONGODB_URI is not set. Please set it as an environment variable or in a .env file.")
+
 
 # Set up your API keys and MongoDB connection
 genai.configure(api_key=GOOGLE_API_KEY)
@@ -61,85 +81,90 @@ def extract_video_id(url):
         return match.group(1)
     return None
 
-@retry(stop_max_attempt_number=5, wait_exponential_multiplier=1000, wait_exponential_max=10000)
+@retry(stop_max_attempt_number=3, wait_exponential_multiplier=1000, wait_exponential_max=10000)
 def extract_transcript_details(video_id):
     """
-    Extracts transcript details from a YouTube video, using a rotating proxy to avoid IP blocking.
+    Extracts transcript details from a YouTube video, using a rotating proxy
+    and User-Agent for each request to avoid IP blocking.
     Args:
         video_id (str): The YouTube video ID.
     Returns:
-        str: The full transcript text, or None if no transcript is found or an error occurs.
+        str: The full transcript text, or None if no transcript is found or
+             an error occurs after multiple retries.
     """
-    # Webshare proxy configuration (Add more proxies to this list for better rotation)
+    # Webshare proxy configuration
     proxy_list = [
         "http://uvmfwcbs-rotate:imui7uhheoxm@p.webshare.io:80",
-        # "http://user2:pass2@host2:port2",  # Add more proxies here to rotate through
+        # "http://user2:pass2@host2:port2",  # Add more proxies here
         # "http://user3:pass3@host3:port3",
     ]
-
-    def get_working_proxy(proxies):
-        """
-        Checks if the proxies are working and returns a working proxy.
-        Args:
-            proxies (list): A list of proxy URLs
-        Returns:
-            str: A working proxy.
-        """
-        for proxy_url in proxies:
-            try:
-                print(f"ℹ️  Checking proxy: {proxy_url}")
-                response = requests.get(
-                    "https://ipv4.webshare.io/",
-                    proxies={"http": proxy_url, "https": proxy_url},
-                    timeout=5  # Added timeout
-                )
-                response.raise_for_status()
-                response_text = response.text
-                if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", response_text):
-                    print(f"✅  Working proxy: {proxy_url}, IP: {response_text}")
-                    return proxy_url
-                else:
-                    print(
-                        f"❌  Proxy {proxy_url} did not return an IP address.  Response: {response_text}"
-                    )
-            except requests.exceptions.RequestException as e:
-                print(f"❌  Proxy {proxy_url} failed: {e}")
-        return None
+    # User-Agent list for rotation
+    user_agent_list = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0",
+        "Mozilla/5.0 (X11; Linux i686; rv:123.0) Gecko/20100101 Firefox/123.0",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/123.0.2420.81 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Edge/123.0.2420.81 Safari/537.36",
+    ]
 
     original_get = requests.get  # Store the original requests.get
-    try:
-        working_proxy = get_working_proxy(proxy_list)
-        if not working_proxy:
-            raise Exception("No working proxies available")
 
-        def proxy_get(*args, **kwargs):
-            kwargs["proxies"] = {"http": working_proxy, "https": working_proxy}
-            return original_get(*args, **kwargs)
+    def get_transcript_with_retry(video_id, current_proxy, num_retries=0):
+        """
+        Helper function to get transcript with retries within the function
+        """
+        nonlocal original_get
+        try:
+            # Introduce a random delay before each request
+            time.sleep(random.uniform(2, 5))  # Simulate human behavior
+            user_agent = random.choice(user_agent_list) # Rotate User-Agent
+            def proxy_get(*args, **kwargs):
+                kwargs["proxies"] = {"http": current_proxy, "https": current_proxy}
+                kwargs["headers"] = {"User-Agent": user_agent}  # Set User-Agent
+                return original_get(*args, **kwargs)
 
-        requests.get = proxy_get  # Apply the monkey patch
-        transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
-        available_languages = [t.language_code for t in transcripts]
-        print(f"Available transcripts for video {video_id}: {available_languages}")
-        for lang in ["en", "en-IN", "hi"]:
-            if lang in available_languages:
-                try:
+            requests.get = proxy_get
+            # Get the IP address used for the request
+            ip_response = requests.get('https://api.ipify.org')
+            ip_address = ip_response.text
+            print(f"Request made from IP address: {ip_address}") # Print IP Address
+            transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
+            available_languages = [t.language_code for t in transcripts]
+            print(f"Available transcripts for video {video_id}: {available_languages}")
+            for lang in ["en", "en-IN", "hi"]:
+                if lang in available_languages:
                     transcript = transcripts.find_transcript([lang])
                     transcript_data = transcript.fetch()
                     full_transcript = " ".join([item.text for item in transcript_data])
-                    print(f"✅ Retrieved transcript for {lang}")
+                    print(f"✅ Retrieved transcript for {lang} using proxy {current_proxy}")
+                    requests.get = original_get
                     return full_transcript
-                except Exception as e:
-                    print(f"❌ Error retrieving transcript for {lang}: {e}")
-        raise ValueError(
-            f"No transcripts found in preferred languages. Available: {available_languages}"
-        )
-    except Exception as e:
-        print(f"❌ Error during transcript extraction: {e}")
-        raise  # Re-raise the exception to trigger retry
-    finally:
-        requests.get = original_get  # Restore the original requests.get
+            requests.get = original_get
+            raise ValueError(
+                f"No transcripts found in preferred languages. Available: {available_languages}"
+            )
+        except Exception as e:
+            requests.get = original_get
+            print(f"❌ Error retrieving transcript with proxy {current_proxy}: {e}")
+            if num_retries < len(proxy_list):
+                next_proxy = proxy_list[num_retries]
+                print(f"🔄 Retrying with proxy {next_proxy}")
+                return get_transcript_with_retry(video_id, next_proxy, num_retries + 1)
+            else:
+                raise  # Re-raise the last exception if all proxies failed
 
-@retry(stop_max_attempt_number=3, wait_fixed=2000)  # Retry summary generation
+    try:
+        # Start the process with the first proxy in the list
+        transcript_text = get_transcript_with_retry(video_id, proxy_list[0])
+        return transcript_text
+
+    except Exception as e:
+        print(f"❌  All retries failed: {e}")
+        raise  # Re-raise to trigger the @retry decorator at the outer level
+
 def generate_gemini_content(transcript_text, prompt):
     model = genai.GenerativeModel("gemini-1.5-flash")
     try:
@@ -150,25 +175,26 @@ def generate_gemini_content(transcript_text, prompt):
         return headline, summary
     except Exception as e:
         print(f"❌ Error generating summary: {e}")
-        st.error(f"❌ Error generating summary. Retrying...")  # Show error with retry message
+        st.error(f"❌ Error generating summary.")
         raise  # Re-raise to trigger retry
 
-@retry(stop_max_attempt_number=3, wait_fixed=2000) #Retry audio generation
-def generate_audio(response_text):
-    try:
-        audio_stream = client.text_to_speech.convert(
-            text=response_text,
-            voice_id="JBFqnCBsd6RMkjVDRZzb",
-            model_id="eleven_multilingual_v2",
-            output_format="mp3_44100_128",
-        )
-        print("audio is ready... now playing")
-        audio_bytes = b"".join(audio_stream)  # Convert generator to bytes
-        return audio_bytes
-    except Exception as e:
-        print(f"❌ Error generating audio: {e}")
-        st.error(f"❌ Error generating audio. Retrying...") # Show error with retry message
-        raise RuntimeError(f"Failed to generate audio: {e}")
+
+
+# def generate_audio(response_text):
+#     try:
+#         audio_stream = client.text_to_speech.convert(
+#             text=response_text,
+#             voice_id="JBFqnCBsd6RMkjVDRZzb",
+#             model_id="eleven_multilingual_v2",
+#             output_format="mp3_44100_128",
+#         )
+#         print("audio is ready... now playing")
+#         audio_bytes = b"".join(audio_stream)  # Convert generator to bytes
+#         return audio_bytes
+#     except Exception as e:
+#         print(f"❌ Error generating audio: {e}")
+#         st.error(f"❌ Error generating audio.")
+#         raise RuntimeError(f"Failed to generate audio: {e}")
 
 # Streamlit app setup
 st.set_page_config(page_title="🎙️ Podcast Summary App", layout="centered")
@@ -240,36 +266,36 @@ if st.button("📝 Generate Detailed Summary"):
         except Exception as e:
             st.error(f"❌ Error: {str(e)}") # Show the last error
 
-# Generate Voice Summary
-if st.button("🎧 Generate Voice Summary"):
-    with st.spinner("🎙️ Processing audio summary..."):
-        try:
-            # Extract transcript text from the YouTube link
-            transcript_text = extract_transcript_details(video_id)
-            if transcript_text:
-                # Generate the headline and summary using the Gemini model
-                headline, summary = generate_gemini_content(transcript_text, prompt)
-                if summary:
-                    # Combine headline and summary
-                    content_to_audio = f"{headline}\n\n{summary}"
-                    # Generate audio for the combined content (headline + summary)
-                    audio_data = generate_audio(content_to_audio)
-                    # Display success message and audio player
-                    st.markdown("### 📄 Headline:")
-                    st.markdown(f"**{headline}**")  # Display the headline
-                    st.markdown("### 📄 Detailed Summary:")
-                    st.markdown(summary)
-                    save_summary(youtube_link, headline, summary)
-                    st.success("✅ Summary has been saved successfully!")
-                    st.success("✅ Voice Summary Ready!")
-                    st.markdown("### 🔊 Play Voice Summary Below:")
-                    st.audio(audio_data, format="audio/mp3")
-                else:
-                    st.warning("⚠️ No summary generated.")
-            else:
-                st.warning("⚠️ No transcript available.")
-        except Exception as e:
-            st.error(f"❌ Error generating voice summary: {str(e)}") # Show the last error
+# # Generate Voice Summary
+# if st.button("🎧 Generate Voice Summary"):
+#     with st.spinner("🎙️ Processing audio summary..."):
+#         try:
+#             # Extract transcript text from the YouTube link
+#             transcript_text = extract_transcript_details(video_id)
+#             if transcript_text:
+#                 # Generate the headline and summary using the Gemini model
+#                 headline, summary = generate_gemini_content(transcript_text, prompt)
+#                 if summary:
+#                     # Combine headline and summary
+#                     content_to_audio = f"{headline}\n\n{summary}"
+#                     # Generate audio for the combined content (headline + summary)
+#                     audio_data = generate_audio(content_to_audio)
+#                     # Display success message and audio player
+#                     st.markdown("### 📄 Headline:")
+#                     st.markdown(f"**{headline}**")  # Display the headline
+#                     st.markdown("### 📄 Detailed Summary:")
+#                     st.markdown(summary)
+#                     save_summary(youtube_link, headline, summary)
+#                     st.success("✅ Summary has been saved successfully!")
+#                     st.success("✅ Voice Summary Ready!")
+#                     st.markdown("### 🔊 Play Voice Summary Below:")
+#                     st.audio(audio_data, format="audio/mp3")
+#                 else:
+#                     st.warning("⚠️ No summary generated.")
+#             else:
+#                 st.warning("⚠️ No transcript available.")
+#         except Exception as e:
+#             st.error(f"❌ Error generating voice summary: {str(e)}") # Show the last error
 
 st.markdown("---")
 st.caption("✨ Built with ❤️ using Streamlit, Google Gemini, and ElevenLabs.")
