@@ -81,7 +81,7 @@ def extract_video_id(url):
         return match.group(1)
     return None
 
-@retry(stop_max_attempt_number=3, wait_exponential_multiplier=1000, wait_exponential_max=10000)
+@retry(stop_max_attempt_number=3, wait_exponential_multiplier=1000, wait_exponential_max=5000)
 def extract_transcript_details(video_id):
     """
     Extracts transcript details from a YouTube video, using a rotating proxy
@@ -93,11 +93,7 @@ def extract_transcript_details(video_id):
              an error occurs after multiple retries.
     """
     # Webshare proxy configuration
-    proxy_list = [
-        "http://uvmfwcbs-rotate:imui7uhheoxm@p.webshare.io:80",
-        # "http://user2:pass2@host2:port2",  # Add more proxies here
-        # "http://user3:pass3@host3:port3",
-    ]
+    proxy_url = "http://uvmfwcbs-rotate:imui7uhheoxm@p.webshare.io:80"
     # User-Agent list for rotation
     user_agent_list = [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
@@ -111,12 +107,16 @@ def extract_transcript_details(video_id):
     ]
 
     original_get = requests.get  # Store the original requests.get
+    
+    # Initialize a counter for proxy rotation
+    proxy_counter = 0
 
     def get_transcript_with_retry(video_id, current_proxy, num_retries=0):
         """
         Helper function to get transcript with retries within the function
         """
         nonlocal original_get
+        nonlocal proxy_counter # Use the nonlocal keyword to modify the global proxy_counter
         try:
             # Introduce a random delay before each request
             time.sleep(random.uniform(2, 5))  # Simulate human behavior
@@ -130,7 +130,7 @@ def extract_transcript_details(video_id):
             # Get the IP address used for the request
             ip_response = requests.get('https://api.ipify.org')
             ip_address = ip_response.text
-            print(f"Request made from IP address: {ip_address}") # Print IP Address
+            st.info(f"Request made from IP address: {ip_address}") # Print IP Address
             transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
             available_languages = [t.language_code for t in transcripts]
             print(f"Available transcripts for video {video_id}: {available_languages}")
@@ -149,16 +149,18 @@ def extract_transcript_details(video_id):
         except Exception as e:
             requests.get = original_get
             print(f"❌ Error retrieving transcript with proxy {current_proxy}: {e}")
-            if num_retries < len(proxy_list):
-                next_proxy = proxy_list[num_retries]
-                print(f"🔄 Retrying with proxy {next_proxy}")
+            if num_retries < 3:
+                # next_proxy = proxy_list[num_retries]
+                proxy_counter += 1
+                next_proxy = f"{proxy_url}:{proxy_counter}"  # Append the counter to the base URL
+                st.info(f"🔄 Retrying with proxy {next_proxy}")
                 return get_transcript_with_retry(video_id, next_proxy, num_retries + 1)
             else:
                 raise  # Re-raise the last exception if all proxies failed
 
     try:
-        # Start the process with the first proxy in the list
-        transcript_text = get_transcript_with_retry(video_id, proxy_list[0])
+        # Start the process with the  proxy URL
+        transcript_text = get_transcript_with_retry(video_id, proxy_url)
         return transcript_text
 
     except Exception as e:
@@ -177,6 +179,9 @@ def generate_gemini_content(transcript_text, prompt):
         print(f"❌ Error generating summary: {e}")
         st.error(f"❌ Error generating summary.")
         raise  # Re-raise to trigger retry
+
+
+
 
 
 
