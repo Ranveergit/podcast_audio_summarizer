@@ -6,9 +6,9 @@ from datetime import datetime
 from dotenv import load_dotenv
 import os
 from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api.proxies import WebshareProxyConfig
 import requests
 import re
+
 
 
 GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
@@ -16,24 +16,25 @@ ELEVENLABS_API_KEY = st.secrets["ELEVENLABS_API_KEY"]
 MONGODB_URI = st.secrets["MONGODB_URI"]
 
 
+
 # Set up your API keys and MongoDB connection
 genai.configure(api_key=GOOGLE_API_KEY)
 client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
 
-# load_dotenv()  # Load variables from .env
 
-# genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-# client = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
 
 # MongoDB Atlas connection setup
 client_mongo = MongoClient(MONGODB_URI)  # MongoDB connection URI
-# client_mongo = MongoClient(os.getenv("MONGODB_URI"))
 db = client_mongo.summaries_db  # Database name
-summaries_collection = db.summaries  # Collection name
+summaries_collection = db.summaries  # Collection name  - corrected line
+
+
 
 prompt = """You are a video summarizer. You will be taking the transcript text
 and summarizing the entire video and providing the important summary in points
 within 250 words. Please provide the summary of the text along with headline in 4 words given here:  """
+
+
 
 # Save summary with headline to MongoDB
 def save_summary(youtube_url, headline, summary):
@@ -41,25 +42,30 @@ def save_summary(youtube_url, headline, summary):
         "youtube_url": youtube_url,
         "headline": headline,  # Store the headline
         "summary": summary,
-        "timestamp": datetime.now()
+        "timestamp": datetime.now(),
     }
     summaries_collection.insert_one(document)
+
+
 
 # Fetch the latest summaries from MongoDB based on user selection
 def get_latest_saved_summaries(limit):
     results = summaries_collection.find().sort("timestamp", -1).limit(limit)
     return list(results)
 
+
+
 # Search summaries in MongoDB by headline
 def search_summaries_by_headline(search_query):
     results = summaries_collection.find({
-        "headline": {"$regex": search_query, "$options": "i"}  # Case-insensitive search by headline
+        "headline": {"$regex": search_query, "$options": "i"},  # Case-insensitive search by headline
     })
     return list(results)
 
 
-## extracting video id :: 
- 
+
+
+
 def extract_video_id(url):
     """
     Extracts the YouTube video ID from different URL formats.
@@ -71,20 +77,20 @@ def extract_video_id(url):
     match = re.search(pattern, url)
     if match:
         return match.group(1)
-    return None    
+    return None
+
+
+
 
 
 def extract_transcript_details(video_id):
     """
     Extracts transcript details from a YouTube video, using a rotating proxy to avoid IP blocking.
-
     Args:
         video_id (str): The YouTube video ID.
-
     Returns:
         str: The full transcript text, or None if no transcript is found or an error occurs.
     """
-
     # Webshare proxy configuration (Add more proxies to this list for better rotation)
     proxy_list = [
         "http://uvmfwcbs-rotate:imui7uhheoxm@p.webshare.io:80",
@@ -110,7 +116,6 @@ def extract_transcript_details(video_id):
                 )
                 response.raise_for_status()
                 response_text = response.text
-
                 if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", response_text):
                     print(f"✅  Working proxy: {proxy_url}, IP: {response_text}")
                     return proxy_url
@@ -118,13 +123,11 @@ def extract_transcript_details(video_id):
                     print(
                         f"❌  Proxy {proxy_url} did not return an IP address.  Response: {response_text}"
                     )
-
             except requests.exceptions.RequestException as e:
                 print(f"❌  Proxy {proxy_url} failed: {e}")
         return None
 
     original_get = requests.get  # Store the original requests.get
-
     try:
         working_proxy = get_working_proxy(proxy_list)
         if not working_proxy:
@@ -135,11 +138,9 @@ def extract_transcript_details(video_id):
             return original_get(*args, **kwargs)
 
         requests.get = proxy_get  # Apply the monkey patch
-
         transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
         available_languages = [t.language_code for t in transcripts]
         print(f"Available transcripts for video {video_id}: {available_languages}")
-
         for lang in ["en", "en-IN", "hi"]:
             if lang in available_languages:
                 try:
@@ -153,7 +154,6 @@ def extract_transcript_details(video_id):
         raise ValueError(
             f"No transcripts found in preferred languages. Available: {available_languages}"
         )
-
     except Exception as e:
         print(f"❌ Error during transcript extraction: {e}")
         return None  # Important:  Return None on error, don't just raise.
@@ -162,17 +162,18 @@ def extract_transcript_details(video_id):
 
 
 
+
+
 # Get the summary and headline based on the YouTube transcript
 def generate_gemini_content(transcript_text, prompt):
     model = genai.GenerativeModel("gemini-1.5-flash")
     response = model.generate_content(prompt + transcript_text)
-    
     # Assuming that the model responds with both headline and summary (you may need to adjust based on actual model behavior)
     lines = response.text.split("\n", 1)
     headline = lines[0] if len(lines) > 0 else "No headline available"
     summary = lines[1] if len(lines) > 1 else "No summary available"
-
     return headline, summary
+
 
 
 
@@ -184,22 +185,22 @@ def generate_audio(response_text):
             text=response_text,
             voice_id="JBFqnCBsd6RMkjVDRZzb",
             model_id="eleven_multilingual_v2",
-            output_format="mp3_44100_128"
+            output_format="mp3_44100_128",
         )
         print("audio is ready... now playing")
-        # play(audio_stream)
         audio_bytes = b"".join(audio_stream)  # Convert generator to bytes
         return audio_bytes
     except Exception as e:
         raise RuntimeError(f"Failed to generate audio: {e}")
-    
-    
+
+
+
+
 
 # Streamlit app setup
 st.set_page_config(page_title="🎙️ Podcast Summary App", layout="centered")
 st.title("🎙️ Podcast Summarizer")
 st.subheader("Summarize & Search Any Podcast Instantly")
-
 # Search functionality for headlines
 search_query = st.text_input("🔍 Search by Headline:")
 if search_query:
@@ -214,12 +215,12 @@ if search_query:
             st.write(f"Timestamp: {result['timestamp']}")
     else:
         st.warning("No summaries found matching your search.")
-
 # Show Latest Saved Summaries Button & Select the number of summaries
 with st.expander("Show Latest Saved Summaries"):
     # Add a slider to select the number of summaries to retrieve
-    num_summaries = st.slider("Select number of latest summaries to show", 1, 20, 10)  # Default: 10, min: 1, max: 20
-    
+    num_summaries = st.slider(
+        "Select number of latest summaries to show", 1, 20, 10
+    )  # Default: 10, min: 1, max: 20
     if st.button("📑 Show Latest Saved Summaries"):
         with st.spinner(f"⏳ Fetching the latest {num_summaries} saved summaries..."):
             try:
@@ -235,10 +236,8 @@ with st.expander("Show Latest Saved Summaries"):
                     st.warning("No saved summaries found.")
             except Exception as e:
                 st.error(f"❌ Error fetching saved summaries: {str(e)}")
-
 # Paste YouTube Link
 youtube_link = st.text_input("🔗 Paste the podcast Link Below:")
-
 if youtube_link:
     try:
         video_id = extract_video_id(youtube_link)
@@ -246,7 +245,6 @@ if youtube_link:
         st.image(thumbnail_url, use_column_width=True, caption="🎬 Video Preview")
     except IndexError:
         st.error("❌ Please enter a valid YouTube video link.")
-
 # Generate Summary with Headline and Optionally Save
 if st.button("📝 Generate Detailed Summary"):
     with st.spinner("⏳ Extracting transcript and summarizing..."):
@@ -254,9 +252,6 @@ if st.button("📝 Generate Detailed Summary"):
             transcript_text = extract_transcript_details(video_id)
             if transcript_text:
                 headline, summary = generate_gemini_content(transcript_text, prompt)
-                
-                
-                
                 # Show the summary
                 st.success("✅ Summary Generated!")
                 st.markdown("### 📄 Headline:")
@@ -265,43 +260,22 @@ if st.button("📝 Generate Detailed Summary"):
                 st.markdown(summary)
                 save_summary(youtube_link, headline, summary)  # Save the headline and summary
                 st.success("✅ Summary has been saved successfully!")
-
-                # Ask the user if they want to save the summary using a radio button
-                # save_permission = st.radio(
-                #     "Would you like to save this summary?",
-                #     options=["Yes", "No"]
-                # )
-
-                # # Check if the user selected "Yes"
-                # if save_permission == "Yes":
-                #     # Provide a Save button for final confirmation
-                #     if st.button("💾 Save Summary"):
-                #         save_summary(youtube_link, headline, summary)  # Save the headline and summary
-                #         st.success("✅ Summary has been saved successfully!")
-                # else:
-                #     st.info("ℹ️ Summary will not be saved.")
-                    
         except Exception as e:
             st.error(f"❌ Error: {str(e)}")
-
 # Generate Voice Summary
 # if st.button("🎧 Generate Voice Summary"):
 #     with st.spinner("🎙️ Processing audio summary..."):
 #         try:
 #             # Extract transcript text from the YouTube link
 #             transcript_text = extract_transcript_details(video_id)
-            
 #             if transcript_text:
 #                 # Generate the headline and summary using the Gemini model
 #                 headline, summary = generate_gemini_content(transcript_text, prompt)
-                
 #                 if summary:
 #                     # Combine headline and summary
 #                     content_to_audio = f"{headline}\n\n{summary}"
-                    
 #                     # Generate audio for the combined content (headline + summary)
 #                     audio_data = generate_audio(content_to_audio)
-                    
 #                     # Display success message and audio player
 #                     st.markdown("### 📄 Headline:")
 #                     st.markdown(f"**{headline}**")  # Display the headline
@@ -310,16 +284,14 @@ if st.button("📝 Generate Detailed Summary"):
 #                     save_summary(youtube_link, headline, summary)
 #                     st.success("✅ Summary has been saved successfully!")
 #                     st.success("✅ Voice Summary Ready!")
-
 #                     st.markdown("### 🔊 Play Voice Summary Below:")
 #                     st.audio(audio_data, format="audio/mp3")
-                    
 #                 else:
 #                     st.warning("⚠️ No summary generated.")
 #             else:
 #                 st.warning("⚠️ No transcript available.")
 #         except Exception as e:
 #             st.error(f"❌ Error generating voice summary: {str(e)}")
-
 st.markdown("---")
 st.caption("✨ Built with ❤️ using Streamlit, Google Gemini, and ElevenLabs.")
+
