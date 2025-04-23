@@ -11,9 +11,10 @@ import requests
 import re
 
 
-GOOGLE_API_KEY = os.environ.get["GOOGLE_API_KEY"]
-ELEVENLABS_API_KEY =os.environ.get["ELEVENLABS_API_KEY"]
-MONGODB_URI = os.environ.get["MONGODB_URI"]
+GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+ELEVENLABS_API_KEY = st.secrets["ELEVENLABS_API_KEY"]
+MONGODB_URI = st.secrets["MONGODB_URI"]
+
 
 # Set up your API keys and MongoDB connection
 genai.configure(api_key=GOOGLE_API_KEY)
