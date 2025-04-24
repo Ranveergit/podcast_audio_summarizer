@@ -12,16 +12,16 @@ import random
 import time
 
 # Your API keys and MongoDB connection (from Streamlit secrets)
-GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
-ELEVENLABS_API_KEY = st.secrets["ELEVENLABS_API_KEY"]
-MONGODB_URI = st.secrets["MONGODB_URI"]
+# GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+# ELEVENLABS_API_KEY = st.secrets["ELEVENLABS_API_KEY"]
+# MONGODB_URI = st.secrets["MONGODB_URI"]
 
 # Load environment variables from .env file
 # load_dotenv()
 
-# GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
-# ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY")
-# MONGODB_URI = os.environ.get("MONGODB_URI")
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY")
+MONGODB_URI = os.environ.get("MONGODB_URI")
 
 # Check if the environment variables are set
 if not GOOGLE_API_KEY:
