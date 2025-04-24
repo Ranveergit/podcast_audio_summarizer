@@ -9,38 +9,46 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from youtube_transcript_api import YouTubeTranscriptApi
 import random
 import time
-# import os  # Import the os module
-# from dotenv import load_dotenv  # Import load_dotenv
 
-# Load environment variables from .env file
-# load_dotenv()
-
-# Your API keys and MongoDB connection (from environment variables)
-# GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
-# ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY")
-# MONGODB_URI = os.environ.get("MONGODB_URI")
-
+# Your API keys and MongoDB connection (from Streamlit secrets)
 GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 ELEVENLABS_API_KEY = st.secrets["ELEVENLABS_API_KEY"]
 MONGODB_URI = st.secrets["MONGODB_URI"]
 
+# Load environment variables from .env file
+# load_dotenv()
+
+# GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+# ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY")
+# MONGODB_URI = os.environ.get("MONGODB_URI")
+
 # Check if the environment variables are set
 if not GOOGLE_API_KEY:
-    raise EnvironmentError("GOOGLE_API_KEY is not set. Please set it as an environment variable or in a .env file.")
+    st.error("GOOGLE_API_KEY is not set. Please check your Streamlit secrets.")
+    raise SystemExit("GOOGLE_API_KEY not set")  # Use SystemExit to stop the app
 if not ELEVENLABS_API_KEY:
-    raise EnvironmentError("ELEVENLABS_API_KEY is not set. Please set it as an environment variable or in a .env file.")
+    st.error("ELEVENLABS_API_KEY is not set. Please check your Streamlit secrets.")
+    raise SystemExit("ELEVENLABS_API_KEY not set")
 if not MONGODB_URI:
-    raise EnvironmentError("MONGODB_URI is not set. Please set it as an environment variable or in a .env file.")
-
+    st.error("MONGODB_URI is not set. Please check your Streamlit secrets.")
+    raise SystemExit("MONGODB_URI not set")
 
 # Set up your API keys and MongoDB connection
 genai.configure(api_key=GOOGLE_API_KEY)
-client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
+try:
+    client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
+except Exception as e:
+    st.error(f"Error initializing ElevenLabs: {e}")
+    raise SystemExit(f"Failed to initialize ElevenLabs: {e}")
 
 # MongoDB Atlas connection setup
-client_mongo = MongoClient(MONGODB_URI)
-db = client_mongo.summaries_db
-summaries_collection = db.summaries
+try:
+    client_mongo = MongoClient(MONGODB_URI)
+    db = client_mongo.summaries_db
+    summaries_collection = db.summaries
+except Exception as e:
+    st.error(f"Error connecting to MongoDB: {e}")
+    raise SystemExit(f"Failed to connect to MongoDB: {e}")
 
 prompt = """You are a video summarizer. You will be taking the transcript text
 and summarizing the entire video and providing the important summary in points
@@ -48,25 +56,37 @@ within 250 words. Please provide the summary of the text along with headline in 
 
 # Save summary with headline to MongoDB
 def save_summary(youtube_url, headline, summary):
-    document = {
-        "youtube_url": youtube_url,
-        "headline": headline,
-        "summary": summary,
-        "timestamp": datetime.now(),
-    }
-    summaries_collection.insert_one(document)
+    try:
+        document = {
+            "youtube_url": youtube_url,
+            "headline": headline,
+            "summary": summary,
+            "timestamp": datetime.now(),
+        }
+        summaries_collection.insert_one(document)
+        st.success("Summary saved to MongoDB.")  # explicitly show a success message
+    except Exception as e:
+        st.error(f"Error saving summary to MongoDB: {e}")
 
 # Fetch the latest summaries from MongoDB based on user selection
 def get_latest_saved_summaries(limit):
-    results = summaries_collection.find().sort("timestamp", -1).limit(limit)
-    return list(results)
+    try:
+        results = summaries_collection.find().sort("timestamp", -1).limit(limit)
+        return list(results)
+    except Exception as e:
+        st.error(f"Error fetching summaries from MongoDB: {e}")
+        return []  # Return an empty list on error to avoid crashing the app
 
 # Search summaries in MongoDB by headline
 def search_summaries_by_headline(search_query):
-    results = summaries_collection.find({
-        "headline": {"$regex": search_query, "$options": "i"},  # Case-insensitive search by headline
-    })
-    return list(results)
+    try:
+        results = summaries_collection.find({
+            "headline": {"$regex": search_query, "$options": "i"},  # Case-insensitive search by headline
+        })
+        return list(results)
+    except Exception as e:
+        st.error(f"Error searching summaries in MongoDB: {e}")
+        return []
 
 def extract_video_id(url):
     """
@@ -81,90 +101,6 @@ def extract_video_id(url):
         return match.group(1)
     return None
 
-
-# @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1000, max=5000))
-# def extract_transcript_details(video_id):
-#     """
-#     Extracts transcript details from a YouTube video, using a rotating proxy
-#     and User-Agent for each request to avoid IP blocking.
-#     Args:
-#         video_id (str): The YouTube video ID.
-#     Returns:
-#         str: The full transcript text, or None if no transcript is found or
-#              an error occurs after multiple retries.
-#     """
-#     # Webshare proxy configuration
-#     proxy_url = "http://uvmfwcbs-rotate:imui7uhheoxm@p.webshare.io:80"
-#     # User-Agent list for rotation
-#     user_agent_list = [
-#         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-#         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-#         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-#         "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
-#         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0",
-#         "Mozilla/5.0 (X11; Linux i686; rv:123.0) Gecko/20100101 Firefox/123.0",
-#         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/123.0.2420.81 Safari/537.36",
-#         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Edge/123.0.2420.81 Safari/537.36",
-#     ]
-
-#     original_get = requests.get  # Store the original requests.get
-    
-#     # Initialize a counter for proxy rotation
-#     proxy_counter = 0
-
-#     def get_transcript_with_retry(video_id, current_proxy, num_retries=0):
-#         """
-#         Helper function to get transcript with retries within the function
-#         """
-#         nonlocal original_get
-#         nonlocal proxy_counter # Use the nonlocal keyword to modify the global proxy_counter
-#         try:
-#             # Introduce a random delay before each request
-#             time.sleep(random.uniform(2, 5))  # Simulate human behavior
-#             user_agent = random.choice(user_agent_list) # Rotate User-Agent
-#             def proxy_get(*args, **kwargs):
-#                 kwargs["proxies"] = {"http": current_proxy, "https": current_proxy}
-#                 kwargs["headers"] = {"User-Agent": user_agent}  # Set User-Agent
-#                 return original_get(*args, **kwargs)
-
-#             requests.get = proxy_get
-#             # Get the IP address used for the request
-#             ip_response = requests.get('https://api.ipify.org')
-#             ip_address = ip_response.text
-#             print(f"Request made from IP address: {ip_address}") # Print IP Address
-#             transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
-#             available_languages = [t.language_code for t in transcripts]
-#             print(f"Available transcripts for video {video_id}: {available_languages}")
-#             for lang in ["en", "en-IN", "hi"]:
-#                 if lang in available_languages:
-#                     transcript = transcripts.find_transcript([lang])
-#                     transcript_data = transcript.fetch()
-#                     full_transcript = " ".join([item.text for item in transcript_data])
-#                     print(f"✅ Retrieved transcript for {lang} using proxy {current_proxy}")
-#                     requests.get = original_get
-#                     return full_transcript
-#             requests.get = original_get
-#             raise ValueError(
-#                 f"No transcripts found in preferred languages. Available: {available_languages}"
-#             )
-#         except Exception as e:
-#             requests.get = original_get
-#             print(f"❌ Error retrieving transcript with proxy {current_proxy}: {e}")
-#             if num_retries < 3:
-#                 proxy_counter += 1
-#                 next_proxy = f"{proxy_url}:{proxy_counter}"
-#                 print(f"🔄 Retrying with proxy: {next_proxy}..")
-#                 return get_transcript_with_retry(video_id, next_proxy, num_retries + 1)
-#             else:
-#                 raise  # Re-raise the last exception if all proxies failed
-
-#     try:
-#         transcript_text = get_transcript_with_retry(video_id, proxy_url)
-#         return transcript_text
-
-#     except Exception as e:
-#         print(f"❌  All retries failed: {e}")
-#         raise
 
 
 def extract_transcript_details(video_id):
@@ -195,7 +131,7 @@ def extract_transcript_details(video_id):
         """
         for proxy_url in proxies:
             try:
-                print(f"ℹ️  Checking proxy: {proxy_url}")
+                print(f"Checking proxy: {proxy_url}") # Removed st.info
                 response = requests.get(
                     "https://ipv4.webshare.io/",
                     proxies={"http": proxy_url, "https": proxy_url},
@@ -205,15 +141,15 @@ def extract_transcript_details(video_id):
                 response_text = response.text
 
                 if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", response_text):
-                    print(f"✅  Working proxy: {proxy_url}, IP: {response_text}")
+                    print(f"Working proxy: {proxy_url}, IP: {response_text}") # Removed st.info
                     return proxy_url
                 else:
                     print(
-                        f"❌  Proxy {proxy_url} did not return an IP address.  Response: {response_text}"
+                        f"Proxy {proxy_url} did not return an IP address.  Response: {response_text}" # Removed st.info
                     )
 
             except requests.exceptions.RequestException as e:
-                print(f"❌  Proxy {proxy_url} failed: {e}")
+                print(f"Proxy {proxy_url} failed: {e}") # Removed st.info
         return None
 
     original_get = requests.get  # Store the original requests.get
@@ -231,7 +167,7 @@ def extract_transcript_details(video_id):
 
         transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
         available_languages = [t.language_code for t in transcripts]
-        print(f"Available transcripts for video {video_id}: {available_languages}")
+        print(f"Available transcripts for video {video_id}: {available_languages}") # Removed st.info
 
         for lang in ["en", "en-IN", "hi"]:
             if lang in available_languages:
@@ -239,16 +175,17 @@ def extract_transcript_details(video_id):
                     transcript = transcripts.find_transcript([lang])
                     transcript_data = transcript.fetch()
                     full_transcript = " ".join([item.text for item in transcript_data])
-                    print(f"✅ Retrieved transcript for {lang}")
+                    print(f"✅ Retrieved transcript for {lang}") # Removed st.info
                     return full_transcript
                 except Exception as e:
-                    print(f"❌ Error retrieving transcript for {lang}: {e}")
+                    print(f"❌ Error retrieving transcript for {lang}: {e}") # Removed st.error
         raise ValueError(
             f"No transcripts found in preferred languages. Available: {available_languages}"
         )
 
     except Exception as e:
         print(f"❌ Error during transcript extraction: {e}")
+        st.error(f"❌ Error during transcript extraction: {e}")  # Show error in Streamlit
         return None  # Important:  Return None on error, don't just raise.
     finally:
         requests.get = original_get  # Restore the original requests.get
@@ -258,14 +195,14 @@ def extract_transcript_details(video_id):
 def generate_gemini_content(transcript_text, prompt):
     model = genai.GenerativeModel("gemini-1.5-flash")
     try:
+        
         response = model.generate_content(prompt + transcript_text)
         lines = response.text.split("\n", 1)
         headline = lines[0] if len(lines) > 0 else "No headline available"
         summary = lines[1] if len(lines) > 1 else "No summary available"
         return headline, summary
     except Exception as e:
-        print(f"❌ Error generating summary: {e}")
-        st.error(f"❌ Error generating summary.")
+        st.error(f"❌ Error generating summary: {e}")
         raise  # Re-raise to trigger retry
 
 
@@ -355,7 +292,10 @@ if st.button("📝 Generate Detailed Summary"):
                 st.markdown("### 📄 Detailed Summary:")
                 st.markdown(summary)
                 save_summary(youtube_link, headline, summary)  # Save the headline and summary
-                st.success("✅ Summary has been saved successfully!")
+                # st.success("✅ Summary has been saved successfully!") # moved to the save_summary
+            else:
+                st.error("Failed to extract transcript.")
+
         except Exception as e:
             st.error(f"❌ Error: {str(e)}") # Show the last error
 
@@ -392,5 +332,3 @@ if st.button("📝 Generate Detailed Summary"):
 
 st.markdown("---")
 st.caption("✨ Built with ❤️ using Streamlit, Google Gemini, and ElevenLabs.")
-
-
