@@ -116,7 +116,17 @@ def extract_transcript_details(video_id):
 
     # Webshare proxy configuration (Add more proxies to this list for better rotation)
     proxy_list = [
-        "http://uvmfwcbs-rotate:imui7uhheoxm@p.webshare.io:80",
+        "http://uvmfwcbs-4:imui7uhheoxm@p.webshare.io:80",
+           "http://uvmfwcbs-4:imui7uhheoxm@p.webshare.io:80",
+           "http://uvmfwcbs-49:imui7uhheoxm@p.webshare.io:80",
+           "http://uvmfwcbs-8:imui7uhheoxm@p.webshare.io:80",
+           "http://uvmfwcbs-9:imui7uhheoxm@p.webshare.io:80",
+           "http://uvmfwcbs-23:imui7uhheoxm@p.webshare.io:80",
+           "http://uvmfwcbs-22:imui7uhheoxm@p.webshare.io:80",
+           "http://uvmfwcbs-4:imui7uhheoxm@p.webshare.io:80",
+           "http://uvmfwcbs-11:imui7uhheoxm@p.webshare.io:80",
+           "http://uvmfwcbs-41:imui7uhheoxm@p.webshare.io:80",
+           "http://uvmfwcbs-4:imui7uhheoxm@p.webshare.io:80"
         # "http://user2:pass2@host2:port2",  # Add more proxies here to rotate through
         # "http://user3:pass3@host3:port3",
     ]
