@@ -234,7 +234,7 @@ def extract_video_id(url):
     
 
 
-ef extract_transcript_details(video_id):
+def extract_transcript_details(video_id):
     """
     Extracts transcript details from a YouTube video, using a rotating proxy to avoid IP blocking.
 
