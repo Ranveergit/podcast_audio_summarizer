@@ -333,7 +333,7 @@ def extract_transcript_details(video_id):
     Returns:
         str: The full transcript text, or None if no transcript is found or an error occurs.
     """
-    # proxy_url = os.environ.get("WEBSHARE_PROXY")  # Get proxy from environment variable
+    proxy_url = os.environ.get("WEBSHARE_PROXY")  # Get proxy from environment variable
 
     if proxy_url:
         proxies = {"http": proxy_url, "https": proxy_url}
