@@ -98,3 +98,5 @@ This Streamlit application allows users to summarize YouTube podcast transcripts
 * The voice summary feature is currently commented out in the provided code. To enable it, uncomment the `generate_audio` function and the "🎧 Generate Voice Summary" button section. Ensure your ElevenLabs API key is correctly configured.
 * Consider implementing more robust error handling and user feedback mechanisms for a better user experience.
 * For production deployments, it's crucial to manage API keys and sensitive information securely using environment variables or secrets management provided by your hosting platform.
+
+
