@@ -5,7 +5,7 @@ from pymongo import MongoClient
 from datetime import datetime
 import requests
 import re
-from retrying import retry  # Import the retry decorator
+from tenacity import retry, stop_after_attempt, wait_exponential
 from youtube_transcript_api import YouTubeTranscriptApi
 import random
 import time
