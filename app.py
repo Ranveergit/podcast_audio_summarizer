@@ -10,6 +10,7 @@ from youtube_transcript_api.proxies import GenericProxyConfig
 from youtube_transcript_api import YouTubeTranscriptApi
 import random
 import time
+import os
 
 # Your API keys and MongoDB connection (from Streamlit secrets)
 # GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
