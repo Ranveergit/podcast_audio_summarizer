@@ -81,7 +81,8 @@ def extract_video_id(url):
         return match.group(1)
     return None
 
-@retry(stop_max_attempt_number=3, wait_exponential_multiplier=1000, wait_exponential_max=5000)
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1000, max=5000))
 def extract_transcript_details(video_id):
     """
     Extracts transcript details from a YouTube video, using a rotating proxy
@@ -130,7 +131,7 @@ def extract_transcript_details(video_id):
             # Get the IP address used for the request
             ip_response = requests.get('https://api.ipify.org')
             ip_address = ip_response.text
-            st.info(f"Request made from IP address: {ip_address}") # Print IP Address
+            print(f"Request made from IP address: {ip_address}") # Print IP Address
             transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
             available_languages = [t.language_code for t in transcripts]
             print(f"Available transcripts for video {video_id}: {available_languages}")
@@ -150,22 +151,21 @@ def extract_transcript_details(video_id):
             requests.get = original_get
             print(f"❌ Error retrieving transcript with proxy {current_proxy}: {e}")
             if num_retries < 3:
-                # next_proxy = proxy_list[num_retries]
                 proxy_counter += 1
-                next_proxy = f"{proxy_url}:{proxy_counter}"  # Append the counter to the base URL
-                st.info(f"🔄 Retrying with proxy different proxy .. ")
+                next_proxy = f"{proxy_url}:{proxy_counter}"
+                print(f"🔄 Retrying with proxy: {next_proxy}..")
                 return get_transcript_with_retry(video_id, next_proxy, num_retries + 1)
             else:
                 raise  # Re-raise the last exception if all proxies failed
 
     try:
-        # Start the process with the  proxy URL
         transcript_text = get_transcript_with_retry(video_id, proxy_url)
         return transcript_text
 
     except Exception as e:
         print(f"❌  All retries failed: {e}")
-        raise  # Re-raise to trigger the @retry decorator at the outer level
+        raise
+
 
 def generate_gemini_content(transcript_text, prompt):
     model = genai.GenerativeModel("gemini-1.5-flash")
