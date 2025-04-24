@@ -82,89 +82,177 @@ def extract_video_id(url):
     return None
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1000, max=5000))
+# @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1000, max=5000))
+# def extract_transcript_details(video_id):
+#     """
+#     Extracts transcript details from a YouTube video, using a rotating proxy
+#     and User-Agent for each request to avoid IP blocking.
+#     Args:
+#         video_id (str): The YouTube video ID.
+#     Returns:
+#         str: The full transcript text, or None if no transcript is found or
+#              an error occurs after multiple retries.
+#     """
+#     # Webshare proxy configuration
+#     proxy_url = "http://uvmfwcbs-rotate:imui7uhheoxm@p.webshare.io:80"
+#     # User-Agent list for rotation
+#     user_agent_list = [
+#         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+#         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+#         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+#         "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+#         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0",
+#         "Mozilla/5.0 (X11; Linux i686; rv:123.0) Gecko/20100101 Firefox/123.0",
+#         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/123.0.2420.81 Safari/537.36",
+#         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Edge/123.0.2420.81 Safari/537.36",
+#     ]
+
+#     original_get = requests.get  # Store the original requests.get
+    
+#     # Initialize a counter for proxy rotation
+#     proxy_counter = 0
+
+#     def get_transcript_with_retry(video_id, current_proxy, num_retries=0):
+#         """
+#         Helper function to get transcript with retries within the function
+#         """
+#         nonlocal original_get
+#         nonlocal proxy_counter # Use the nonlocal keyword to modify the global proxy_counter
+#         try:
+#             # Introduce a random delay before each request
+#             time.sleep(random.uniform(2, 5))  # Simulate human behavior
+#             user_agent = random.choice(user_agent_list) # Rotate User-Agent
+#             def proxy_get(*args, **kwargs):
+#                 kwargs["proxies"] = {"http": current_proxy, "https": current_proxy}
+#                 kwargs["headers"] = {"User-Agent": user_agent}  # Set User-Agent
+#                 return original_get(*args, **kwargs)
+
+#             requests.get = proxy_get
+#             # Get the IP address used for the request
+#             ip_response = requests.get('https://api.ipify.org')
+#             ip_address = ip_response.text
+#             print(f"Request made from IP address: {ip_address}") # Print IP Address
+#             transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
+#             available_languages = [t.language_code for t in transcripts]
+#             print(f"Available transcripts for video {video_id}: {available_languages}")
+#             for lang in ["en", "en-IN", "hi"]:
+#                 if lang in available_languages:
+#                     transcript = transcripts.find_transcript([lang])
+#                     transcript_data = transcript.fetch()
+#                     full_transcript = " ".join([item.text for item in transcript_data])
+#                     print(f"✅ Retrieved transcript for {lang} using proxy {current_proxy}")
+#                     requests.get = original_get
+#                     return full_transcript
+#             requests.get = original_get
+#             raise ValueError(
+#                 f"No transcripts found in preferred languages. Available: {available_languages}"
+#             )
+#         except Exception as e:
+#             requests.get = original_get
+#             print(f"❌ Error retrieving transcript with proxy {current_proxy}: {e}")
+#             if num_retries < 3:
+#                 proxy_counter += 1
+#                 next_proxy = f"{proxy_url}:{proxy_counter}"
+#                 print(f"🔄 Retrying with proxy: {next_proxy}..")
+#                 return get_transcript_with_retry(video_id, next_proxy, num_retries + 1)
+#             else:
+#                 raise  # Re-raise the last exception if all proxies failed
+
+#     try:
+#         transcript_text = get_transcript_with_retry(video_id, proxy_url)
+#         return transcript_text
+
+#     except Exception as e:
+#         print(f"❌  All retries failed: {e}")
+#         raise
+
+
 def extract_transcript_details(video_id):
     """
-    Extracts transcript details from a YouTube video, using a rotating proxy
-    and User-Agent for each request to avoid IP blocking.
+    Extracts transcript details from a YouTube video, using a rotating proxy to avoid IP blocking.
+
     Args:
         video_id (str): The YouTube video ID.
+
     Returns:
-        str: The full transcript text, or None if no transcript is found or
-             an error occurs after multiple retries.
+        str: The full transcript text, or None if no transcript is found or an error occurs.
     """
-    # Webshare proxy configuration
-    proxy_url = "http://uvmfwcbs-rotate:imui7uhheoxm@p.webshare.io:80"
-    # User-Agent list for rotation
-    user_agent_list = [
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:123.0) Gecko/20100101 Firefox/123.0",
-        "Mozilla/5.0 (X11; Linux i686; rv:123.0) Gecko/20100101 Firefox/123.0",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Edge/123.0.2420.81 Safari/537.36",
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Edge/123.0.2420.81 Safari/537.36",
+
+    # Webshare proxy configuration (Add more proxies to this list for better rotation)
+    proxy_list = [
+        "http://uvmfwcbs-rotate:imui7uhheoxm@p.webshare.io:80",
+        # "http://user2:pass2@host2:port2",  # Add more proxies here to rotate through
+        # "http://user3:pass3@host3:port3",
     ]
 
+    def get_working_proxy(proxies):
+        """
+        Checks if the proxies are working and returns a working proxy.
+        Args:
+            proxies (list): A list of proxy URLs
+        Returns:
+             str: A working proxy.
+        """
+        for proxy_url in proxies:
+            try:
+                print(f"ℹ️  Checking proxy: {proxy_url}")
+                response = requests.get(
+                    "https://ipv4.webshare.io/",
+                    proxies={"http": proxy_url, "https": proxy_url},
+                    timeout=5  # Added timeout
+                )
+                response.raise_for_status()
+                response_text = response.text
+
+                if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", response_text):
+                    print(f"✅  Working proxy: {proxy_url}, IP: {response_text}")
+                    return proxy_url
+                else:
+                    print(
+                        f"❌  Proxy {proxy_url} did not return an IP address.  Response: {response_text}"
+                    )
+
+            except requests.exceptions.RequestException as e:
+                print(f"❌  Proxy {proxy_url} failed: {e}")
+        return None
+
     original_get = requests.get  # Store the original requests.get
-    
-    # Initialize a counter for proxy rotation
-    proxy_counter = 0
 
-    def get_transcript_with_retry(video_id, current_proxy, num_retries=0):
-        """
-        Helper function to get transcript with retries within the function
-        """
-        nonlocal original_get
-        nonlocal proxy_counter # Use the nonlocal keyword to modify the global proxy_counter
-        try:
-            # Introduce a random delay before each request
-            time.sleep(random.uniform(2, 5))  # Simulate human behavior
-            user_agent = random.choice(user_agent_list) # Rotate User-Agent
-            def proxy_get(*args, **kwargs):
-                kwargs["proxies"] = {"http": current_proxy, "https": current_proxy}
-                kwargs["headers"] = {"User-Agent": user_agent}  # Set User-Agent
-                return original_get(*args, **kwargs)
+    try:
+        working_proxy = get_working_proxy(proxy_list)
+        if not working_proxy:
+            raise Exception("No working proxies available")
 
-            requests.get = proxy_get
-            # Get the IP address used for the request
-            ip_response = requests.get('https://api.ipify.org')
-            ip_address = ip_response.text
-            print(f"Request made from IP address: {ip_address}") # Print IP Address
-            transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
-            available_languages = [t.language_code for t in transcripts]
-            print(f"Available transcripts for video {video_id}: {available_languages}")
-            for lang in ["en", "en-IN", "hi"]:
-                if lang in available_languages:
+        def proxy_get(*args, **kwargs):
+            kwargs["proxies"] = {"http": working_proxy, "https": working_proxy}
+            return original_get(*args, **kwargs)
+
+        requests.get = proxy_get  # Apply the monkey patch
+
+        transcripts = YouTubeTranscriptApi.list_transcripts(video_id)
+        available_languages = [t.language_code for t in transcripts]
+        print(f"Available transcripts for video {video_id}: {available_languages}")
+
+        for lang in ["en", "en-IN", "hi"]:
+            if lang in available_languages:
+                try:
                     transcript = transcripts.find_transcript([lang])
                     transcript_data = transcript.fetch()
                     full_transcript = " ".join([item.text for item in transcript_data])
-                    print(f"✅ Retrieved transcript for {lang} using proxy {current_proxy}")
-                    requests.get = original_get
+                    print(f"✅ Retrieved transcript for {lang}")
                     return full_transcript
-            requests.get = original_get
-            raise ValueError(
-                f"No transcripts found in preferred languages. Available: {available_languages}"
-            )
-        except Exception as e:
-            requests.get = original_get
-            print(f"❌ Error retrieving transcript with proxy {current_proxy}: {e}")
-            if num_retries < 3:
-                proxy_counter += 1
-                next_proxy = f"{proxy_url}:{proxy_counter}"
-                print(f"🔄 Retrying with proxy: {next_proxy}..")
-                return get_transcript_with_retry(video_id, next_proxy, num_retries + 1)
-            else:
-                raise  # Re-raise the last exception if all proxies failed
-
-    try:
-        transcript_text = get_transcript_with_retry(video_id, proxy_url)
-        return transcript_text
+                except Exception as e:
+                    print(f"❌ Error retrieving transcript for {lang}: {e}")
+        raise ValueError(
+            f"No transcripts found in preferred languages. Available: {available_languages}"
+        )
 
     except Exception as e:
-        print(f"❌  All retries failed: {e}")
-        raise
+        print(f"❌ Error during transcript extraction: {e}")
+        return None  # Important:  Return None on error, don't just raise.
+    finally:
+        requests.get = original_get  # Restore the original requests.get
+
 
 
 def generate_gemini_content(transcript_text, prompt):
