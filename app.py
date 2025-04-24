@@ -153,7 +153,7 @@ def extract_transcript_details(video_id):
                 # next_proxy = proxy_list[num_retries]
                 proxy_counter += 1
                 next_proxy = f"{proxy_url}:{proxy_counter}"  # Append the counter to the base URL
-                st.info(f"🔄 Retrying with proxy {next_proxy}")
+                st.info(f"🔄 Retrying with proxy different proxy .. ")
                 return get_transcript_with_retry(video_id, next_proxy, num_retries + 1)
             else:
                 raise  # Re-raise the last exception if all proxies failed
